@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Code Generator — Bootstrap</title>
+  <!-- Bootstrap 5 CSS (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- qrcodejs (small, no build step) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    .preview-box{
+      min-height:260px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:1rem;
+      border-radius:.375rem;
+      background-color: #f8f9fa;
+    }
+    .gap-2 { gap: .5rem; }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-4">QR Code Generator — standalone HTML (Bootstrap)</h1>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label for="text" class="form-label">Text / URL</label>
+              <textarea id="text" class="form-control" rows="6" placeholder="Enter text or URL..." autofocus></textarea>
+            </div>
+
+            <div class="row">
+              <div class="col-6 mb-3">
+                <label for="size" class="form-label">Size (px)</label>
+                <input id="size" type="range" min="128" max="1024" value="256" class="form-range" oninput="sizeLabel.textContent = size.value">
+                <div class="form-text">Current: <span id="sizeLabel">256</span> px</div>
+              </div>
+
+              <div class="col-6 mb-3">
+                <label for="ecLevel" class="form-label">Error Correction</label>
+                <select id="ecLevel" class="form-select">
+                  <option value="L">L — Low (7%)</option>
+                  <option value="M" selected>M — Medium (15%)</option>
+                  <option value="Q">Q — Quartile (25%)</option>
+                  <option value="H">H — High (30%)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button id="generateBtn" class="btn btn-primary">Generate</button>
+              <button id="downloadBtn" class="btn btn-success">Download PNG</button>
+              <button id="copyBtn" class="btn btn-secondary">Copy PNG</button>
+            </div>
+
+            <p class="small text-muted mt-3">Tip: paste a URL, set size, and click <strong>Generate</strong>. Use <strong>Download PNG</strong> to save the image file.</p>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Preview</label>
+            <div id="qrcodePreview" class="preview-box border"></div>
+            <div id="rawData" class="mt-2 small text-muted text-break"></div>
+          </div>
+        </div>
+
+        <div class="mt-3 small text-muted">Standalone file — no server required. Works offline once the CDNs are cached.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const textEl = document.getElementById('text');
+  const size = document.getElementById('size');
+  const ecLevel = document.getElementById('ecLevel');
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const preview = document.getElementById('qrcodePreview');
+  const rawData = document.getElementById('rawData');
+
+  function clearPreview(){ preview.innerHTML = ''; }
+
+  function getCorrectLevel(level){
+    switch(level){
+      case 'L': return QRCode.CorrectLevel.L;
+      case 'M': return QRCode.CorrectLevel.M;
+      case 'Q': return QRCode.CorrectLevel.Q;
+      case 'H': return QRCode.CorrectLevel.H;
+      default: return QRCode.CorrectLevel.M;
+    }
+  }
+
+  function generate(){
+    const value = textEl.value.trim();
+    if(!value){ alert('Please enter text or a URL to encode.'); return; }
+
+    clearPreview();
+
+    const opts = {
+      text: value,
+      width: parseInt(size.value,10),
+      height: parseInt(size.value,10),
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: getCorrectLevel(ecLevel.value)
+    };
+
+    try{
+      new QRCode(preview, opts);
+      rawData.textContent = `Encoded (${opts.width}×${opts.height}, EC=${ecLevel.value}): ` + value;
+    }catch(e){
+      alert('QR generation failed: ' + e);
+    }
+  }
+
+  function getDataUrlFromPreview(){
+    const img = preview.querySelector('img');
+    if(img && img.src) return img.src;
+    const canvas = preview.querySelector('canvas');
+    if(canvas) return canvas.toDataURL('image/png');
+    return null;
+  }
+
+  generateBtn.addEventListener('click', generate);
+
+  downloadBtn.addEventListener('click', () => {
+    const dataUrl = getDataUrlFromPreview();
+    if(!dataUrl){ alert('No QR code to download — generate one first.'); return; }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'qrcode.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    const dataUrl = getDataUrlFromPreview();
+    if(!dataUrl){ alert('No QR code to copy — generate one first.'); return; }
+
+    try{
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      alert('QR image copied to clipboard (may require a modern browser).');
+    }catch(e){
+      try{ await navigator.clipboard.writeText(dataUrl); alert('Data URL copied to clipboard.'); }catch(err){ alert('Copy failed: ' + err); }
+    }
+  });
+
+  textEl.addEventListener('keydown', (ev) => {
+    if((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') generate();
+  });
+
+  // Seed example and initial generate
+  textEl.value = 'https://example.com';
+  generate();
+</script>
+</body>
+</html>
